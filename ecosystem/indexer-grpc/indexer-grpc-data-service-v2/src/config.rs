@@ -4,23 +4,33 @@
 use crate::{
     connection_manager::ConnectionManager,
     historical_data_service::HistoricalDataService,
+    live_data_service::LiveDataService,
     service::{DataServiceWrapper, DataServiceWrapperWrapper},
 };
 use anyhow::Result;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
+use aptos_indexer_grpc_utils::{
+    config::IndexerGrpcFileStoreConfig,
+    status_page::{get_throughput_from_samples, render_status_page, Tab},
+};
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
+use build_html::{
+    Container, ContainerType, HtmlContainer, HtmlElement, HtmlTag, Table, TableCell, TableCellType,
+    TableRow,
+};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 use tonic::{codec::CompressionEncoding, transport::Server};
 use tracing::info;
+use warp::{reply::Response, Rejection};
 
+pub(crate) static LIVE_DATA_SERVICE: OnceCell<LiveDataService<'static>> = OnceCell::new();
 pub(crate) static HISTORICAL_DATA_SERVICE: OnceCell<HistoricalDataService> = OnceCell::new();
 
 pub(crate) const MAX_MESSAGE_SIZE: usize = 256 * (1 << 20);
@@ -50,6 +60,26 @@ pub struct ServiceConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct LiveDataServiceConfig {
+    pub enabled: bool,
+    #[serde(default = "LiveDataServiceConfig::default_num_slots")]
+    pub num_slots: usize,
+    #[serde(default = "LiveDataServiceConfig::default_size_limit_bytes")]
+    pub size_limit_bytes: usize,
+}
+
+impl LiveDataServiceConfig {
+    fn default_num_slots() -> usize {
+        5_000_000
+    }
+
+    fn default_size_limit_bytes() -> usize {
+        10_000_000_000
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct HistoricalDataServiceConfig {
     pub enabled: bool,
     pub file_store_config: IndexerGrpcFileStoreConfig,
@@ -60,6 +90,7 @@ pub struct HistoricalDataServiceConfig {
 pub struct IndexerGrpcDataServiceConfig {
     pub(crate) chain_id: u64,
     pub(crate) service_config: ServiceConfig,
+    pub(crate) live_data_service_config: LiveDataServiceConfig,
     pub(crate) historical_data_service_config: HistoricalDataServiceConfig,
     pub(crate) grpc_manager_addresses: Vec<String>,
     pub(crate) self_advertised_address: String,
@@ -70,6 +101,48 @@ pub struct IndexerGrpcDataServiceConfig {
 impl IndexerGrpcDataServiceConfig {
     const fn default_data_service_response_channel_size() -> usize {
         DEFAULT_MAX_RESPONSE_CHANNEL_SIZE
+    }
+
+    async fn create_live_data_service(
+        &self,
+        tasks: &mut Vec<JoinHandle<Result<()>>>,
+    ) -> Option<DataServiceWrapper> {
+        if !self.live_data_service_config.enabled {
+            return None;
+        }
+        let connection_manager = Arc::new(
+            ConnectionManager::new(
+                self.chain_id,
+                self.grpc_manager_addresses.clone(),
+                self.self_advertised_address.clone(),
+                /*is_live_data_service=*/ true,
+            )
+            .await,
+        );
+        let (handler_tx, handler_rx) = tokio::sync::mpsc::channel(10);
+        let service = DataServiceWrapper::new(
+            connection_manager.clone(),
+            handler_tx,
+            self.data_service_response_channel_size,
+            /*is_live_data_service=*/ true,
+        );
+
+        let connection_manager_clone = connection_manager.clone();
+        tasks.push(tokio::task::spawn(async move {
+            connection_manager_clone.start().await;
+            Ok(())
+        }));
+
+        let chain_id = self.chain_id;
+        let config = self.live_data_service_config.clone();
+        tasks.push(tokio::task::spawn_blocking(move || {
+            LIVE_DATA_SERVICE
+                .get_or_init(|| LiveDataService::new(chain_id, config, connection_manager))
+                .run(handler_rx);
+            Ok(())
+        }));
+
+        Some(service)
     }
 
     async fn create_historical_data_service(
@@ -135,9 +208,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
 
         let mut tasks = vec![];
 
-        // TODO(grao): Implement.
-        let live_data_service = None;
-
+        let live_data_service = self.create_live_data_service(&mut tasks).await;
         let historical_data_service = self.create_historical_data_service(&mut tasks).await;
 
         let wrapper = Arc::new(DataServiceWrapperWrapper::new(
@@ -197,4 +268,121 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
     fn get_server_name(&self) -> String {
         "indexer_grpc_data_service_v2".to_string()
     }
+
+    async fn status_page(&self) -> Result<Response, Rejection> {
+        let mut tabs = vec![];
+        // TODO(grao): Add something real.
+        let overview_tab_content = HtmlElement::new(HtmlTag::Div).with_raw("Welcome!").into();
+        tabs.push(Tab::new("Overview", overview_tab_content));
+        if let Some(live_data_service) = LIVE_DATA_SERVICE.get() {
+            let connection_manager_info =
+                render_connection_manager_info(live_data_service.get_connection_manager());
+            let cache_info = render_cache_info();
+            let content = HtmlElement::new(HtmlTag::Div)
+                .with_container(connection_manager_info)
+                .with_container(cache_info)
+                .into();
+            tabs.push(Tab::new("LiveDataService", content));
+        }
+
+        if let Some(historical_data_service) = HISTORICAL_DATA_SERVICE.get() {
+            let connection_manager_info =
+                render_connection_manager_info(historical_data_service.get_connection_manager());
+            let file_store_info = render_file_store_info();
+            let content = HtmlElement::new(HtmlTag::Div)
+                .with_container(connection_manager_info)
+                .with_container(file_store_info)
+                .into();
+            tabs.push(Tab::new("HistoricalDataService", content));
+        }
+
+        render_status_page(tabs)
+    }
+}
+
+fn render_connection_manager_info(connection_manager: &ConnectionManager) -> Container {
+    let known_latest_version = connection_manager.known_latest_version();
+    let active_streams = connection_manager.get_active_streams();
+    let active_streams_table = active_streams.into_iter().fold(
+        Table::new()
+            .with_attributes([("style", "width: 100%; border: 5px solid black;")])
+            .with_thead_attributes([("style", "background-color: lightcoral; color: white;")])
+            .with_custom_header_row(
+                TableRow::new()
+                    .with_cell(TableCell::new(TableCellType::Header).with_raw("Id"))
+                    .with_cell(TableCell::new(TableCellType::Header).with_raw("Current Version"))
+                    .with_cell(TableCell::new(TableCellType::Header).with_raw("End Version"))
+                    .with_cell(
+                        TableCell::new(TableCellType::Header).with_raw("Past 10s throughput"),
+                    )
+                    .with_cell(
+                        TableCell::new(TableCellType::Header).with_raw("Past 60s throughput"),
+                    )
+                    .with_cell(
+                        TableCell::new(TableCellType::Header).with_raw("Past 10min throughput"),
+                    ),
+            ),
+        |table, active_stream| {
+            table.with_custom_body_row(
+                TableRow::new()
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(&active_stream.id))
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(format!(
+                            "{:?}",
+                            active_stream
+                                .progress.as_ref()
+                                .map(|progress| {
+                                    progress.samples.last().map(|sample| sample.version)
+                                })
+                                .flatten()
+                        )))
+                    .with_cell(
+                        TableCell::new(TableCellType::Data).with_raw(active_stream.end_version()),
+                    )
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(
+                        get_throughput_from_samples(
+                            active_stream.progress.as_ref(),
+                            Duration::from_secs(10),
+                        ),
+                    ))
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(
+                        get_throughput_from_samples(
+                            active_stream.progress.as_ref(),
+                            Duration::from_secs(60),
+                        ),
+                    ))
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(
+                        get_throughput_from_samples(
+                            active_stream.progress.as_ref(),
+                            Duration::from_secs(600),
+                        ),
+                    )),
+            )
+        },
+    );
+
+    Container::new(ContainerType::Section)
+        .with_paragraph_attr(
+            "Connection Manager",
+            [("style", "font-size: 24px; font-weight: bold;")],
+        )
+        .with_paragraph(format!("Known latest version: {known_latest_version}."))
+        .with_paragraph_attr(
+            "Active Streams",
+            [("style", "font-size: 16px; font-weight: bold;")],
+        )
+        .with_table(active_streams_table)
+}
+
+fn render_cache_info() -> Container {
+    Container::new(ContainerType::Section).with_paragraph_attr(
+        "In Memory Cache",
+        [("style", "font-size: 24px; font-weight: bold;")],
+    )
+}
+
+fn render_file_store_info() -> Container {
+    Container::new(ContainerType::Section).with_paragraph_attr(
+        "File Store",
+        [("style", "font-size: 24px; font-weight: bold;")],
+    )
 }

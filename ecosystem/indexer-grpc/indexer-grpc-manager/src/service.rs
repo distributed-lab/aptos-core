@@ -122,7 +122,7 @@ impl GrpcManager for GrpcManagerService {
                     return self
                         .handle_heartbeat(address, info)
                         .await
-                        .map_err(|e| Status::internal(format!("Error handling heartbeat: {e}")));
+                        .map_err(|e| Status::internal(&format!("Error handling heartbeat: {e}")));
                 }
             }
         }
