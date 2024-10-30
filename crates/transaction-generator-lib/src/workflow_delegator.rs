@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
+    ObjectPool, ReliableTransactionSubmitter, ReplayProtectionType, RootAccountHandle, TransactionGenerator,
     TransactionGeneratorCreator, WorkflowProgress,
 };
 use aptos_logger::{info, sample, sample::SampleRate};
@@ -284,6 +284,7 @@ impl WorkflowTxnGeneratorCreator {
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
+        replay_protection: ReplayProtectionType,
     ) -> Self {
         assert_eq!(num_modules, 1, "Only one module is supported for now");
 

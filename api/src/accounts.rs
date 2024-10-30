@@ -223,20 +223,27 @@ impl Account {
     /// * BCS: Return a BCS encoded version of [`AccountData`]
     pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
         // Retrieve the Account resource and convert it accordingly
-        let state_value = self.get_account_resource()?;
-
-        // Convert the AccountResource into the summary object AccountData
-        let account_resource: AccountResource = bcs::from_bytes(&state_value)
-            .context("Internal error deserializing response from DB")
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
-                )
-            })?;
-        let account_data: AccountData = account_resource.into();
-
+        let account_data: AccountData = if let Ok(state_value) = self.get_account_resource() {
+            // Convert the AccountResource into the summary object AccountData
+            let account_resource: AccountResource = bcs::from_bytes(&state_value)
+                .context("Internal error deserializing response from DB")
+                .map_err(|err| {
+                    BasicErrorWith404::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &self.latest_ledger_info,
+                    )
+                })?;
+            account_resource.into()
+        } else {
+            AccountData {
+                sequence_number: 0,
+                // Question: What's the right authentication key to return here?
+                authentication_key: HexEncodedBytes::new(Vec::new()),
+                state_exists: false,
+            }
+        };
+        
         match accept_type {
             AcceptType::Json => BasicResponse::try_from_json((
                 account_data,

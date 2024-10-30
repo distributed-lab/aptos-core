@@ -6,18 +6,22 @@ use crate::{
     move_types::account_address::AccountAddress,
     types::{
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
+        transaction::{
+            authenticator::AuthenticationKey, RawTransaction, TransactionPayloadWrapper,
+        },
     },
 };
 pub use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
-use aptos_types::transaction::{EntryFunction, Script};
+use aptos_types::transaction::{
+    EntryFunction, Script, TransactionExtraConfig, TransactionPayloadInner,
+};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
     sequence_number: Option<u64>,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     max_gas_amount: u64,
     gas_unit_price: u64,
     expiration_timestamp_secs: u64,
@@ -25,8 +29,12 @@ pub struct TransactionBuilder {
 }
 
 impl TransactionBuilder {
+    // TODO: It should probably be changed to take TransactionExecutable, instead of TransactionPayloadWrapper,
+    // be able to set replay protection (both nonce and sequence number on it), have a multisig address,
+    // and then select between v1 and v2 (or make v2 default after flags get enabled)
+    // To update this without breaking clients, discuss the right strategy with Greg.
     pub fn new(
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -72,11 +80,20 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn has_nonce(&self) -> bool {
+        self.payload.has_nonce()
+    }
+
     pub fn build(self) -> RawTransaction {
+        let sequence_number = if self.has_nonce() {
+            u64::MAX
+        } else {
+            self.sequence_number
+                .expect("sequence number must have been set")
+        };
         RawTransaction::new(
             self.sender.expect("sender must have been set"),
-            self.sequence_number
-                .expect("sequence number must have been set"),
+            sequence_number,
             self.payload,
             self.max_gas_amount,
             self.gas_unit_price,
@@ -141,12 +158,13 @@ impl TransactionFactory {
         self.chain_id
     }
 
-    pub fn payload(&self, payload: TransactionPayload) -> TransactionBuilder {
+    pub fn payload(&self, payload: TransactionPayloadWrapper) -> TransactionBuilder {
         self.transaction_builder(payload)
     }
 
     pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
-        self.payload(TransactionPayload::EntryFunction(func))
+        // TODO: Change this to use TransactionPayloadWrapper::Payload once it's available
+        self.payload(TransactionPayloadWrapper::EntryFunction(func))
     }
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
@@ -270,10 +288,11 @@ impl TransactionFactory {
     //
 
     pub fn script(&self, script: Script) -> TransactionBuilder {
-        self.payload(TransactionPayload::Script(script))
+        // TODO: Change this to use TransactionPayloadWrapper::Payload once it's available
+        self.payload(TransactionPayloadWrapper::Script(script))
     }
 
-    fn transaction_builder(&self, payload: TransactionPayload) -> TransactionBuilder {
+    fn transaction_builder(&self, payload: TransactionPayloadWrapper) -> TransactionBuilder {
         TransactionBuilder {
             sender: None,
             sequence_number: None,
