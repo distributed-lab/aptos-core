@@ -11,7 +11,7 @@ use aptos_types::{
 use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
 
-mod sender_aware;
+pub mod sender_aware;
 pub mod use_case_aware;
 
 // re-export use case aware shuffler for fuzzer.
@@ -34,7 +34,7 @@ pub trait TransactionShuffler: Send + Sync {
     ) -> Box<dyn Iterator<Item = SignedTransaction> + 'static>;
 
     /// Given a configuration and a vector of SignatureVerifiedTransaction, return an iterator of
-    /// SignedTransaction.
+    /// SignatureVerifiedTransaction.
     fn signature_verified_transaction_iterator(
         &self,
         txns: Vec<SignatureVerifiedTransaction>,
