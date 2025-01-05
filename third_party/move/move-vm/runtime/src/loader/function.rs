@@ -100,7 +100,6 @@ impl LazyLoadedFunction {
         })))
     }
 
-    #[allow(unused)]
     pub(crate) fn new_resolved(
         converter: &TypeTagConverter,
         fun: Rc<LoadedFunction>,
