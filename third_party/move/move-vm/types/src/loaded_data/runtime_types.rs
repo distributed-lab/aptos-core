@@ -13,8 +13,6 @@ use move_binary_format::{
         VariantIndex,
     },
 };
-#[cfg(test)]
-use move_core_types::account_address::AccountAddress;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -133,8 +131,6 @@ pub struct StructType {
     pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub ty_params: Vec<StructTypeParameter>,
-    pub name: Identifier,
-    pub module: ModuleId,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -254,8 +250,6 @@ impl StructType {
             phantom_ty_params_mask: SmallBitVec::new(),
             abilities: AbilitySet::EMPTY,
             ty_params: vec![],
-            name: Identifier::new("Foo").unwrap(),
-            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
         }
     }
 }
