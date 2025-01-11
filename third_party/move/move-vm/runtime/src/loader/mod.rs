@@ -13,8 +13,8 @@ use crate::{
         loader::LoaderV2,
         module_storage::{FunctionValueExtensionAdapter, ModuleStorage},
         ty_cache::StructInfoCache,
+        ty_tag_cache::TypeTagBuilder,
     },
-    ty_tag_cache::TypeTagBuilder,
     CodeStorage,
 };
 use hashbrown::Equivalent;
