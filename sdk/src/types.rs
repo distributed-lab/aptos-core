@@ -486,7 +486,8 @@ impl TransactionSigner for HardwareWalletAccount {
         let two_minutes = Duration::from_secs(2 * 60);
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH)? + two_minutes;
         let seconds = current_time.as_secs();
-        let sequence_number = if builder.has_nonce() {
+        let orderless = builder.has_nonce();
+        let sequence_number = if orderless {
             u64::MAX
         } else {
             self.sequence_number()
@@ -497,7 +498,7 @@ impl TransactionSigner for HardwareWalletAccount {
             .expiration_timestamp_secs(seconds)
             .build();
 
-        if !builder.has_nonce() {
+        if !orderless {
             *self.sequence_number_mut() += 1;
         }
         self.sign_transaction(raw_txn)

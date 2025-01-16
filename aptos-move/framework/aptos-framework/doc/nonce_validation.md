@@ -175,6 +175,9 @@
     <b>let</b> nonce_history = <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
         nonce_table: <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>,
     };
+    // Question: We need <b>to</b> prefill this <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> in the beginning, so that we pay for the intial storage cost
+    // I'm not sure what's the best way <b>to</b> initialize. If we initialize the <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> here, will it be only executed
+    // in <a href="genesis.md#0x1_genesis">genesis</a>? If this function is executed only in <a href="genesis.md#0x1_genesis">genesis</a>, then will it run on mainnet when we release this feature?
     <b>move_to</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(aptos_framework, nonce_history);
 }
 </code></pre>

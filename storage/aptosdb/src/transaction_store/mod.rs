@@ -13,7 +13,7 @@ use aptos_db_indexer_schemas::{
     },
     utils::{AccountOrderedTransactionsIter, AccountTransactionSummariesIter},
 };
-use aptos_schemadb::batch::{iterator::ScanDirection, SchemaBatch};
+use aptos_schemadb::{iterator::ScanDirection, batch::SchemaBatch};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,

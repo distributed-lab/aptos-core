@@ -27,7 +27,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     language_storage::ModuleId,
-    value::{serialize_values, MoveValue, MoveStruct},
+    value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use move_vm_runtime::{

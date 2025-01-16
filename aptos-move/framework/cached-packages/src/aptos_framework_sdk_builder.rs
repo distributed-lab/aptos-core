@@ -3930,8 +3930,8 @@ pub fn object_code_deployment_publish(
 }
 
 /// Revoke all storable permission handle of the signer immediately.
-pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn permissioned_signer_revoke_all_handles() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3949,8 +3949,8 @@ pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
 /// the storable permission handle to derive signer from it anymore.
 pub fn permissioned_signer_revoke_permission_storage_address(
     permissions_storage_addr: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -6300,9 +6300,9 @@ mod decoder {
     }
 
     pub fn permissioned_signer_revoke_all_handles(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::PermissionedSignerRevokeAllHandles {})
         } else {
             None
@@ -6310,9 +6310,9 @@ mod decoder {
     }
 
     pub fn permissioned_signer_revoke_permission_storage_address(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::PermissionedSignerRevokePermissionStorageAddress {
                     permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,

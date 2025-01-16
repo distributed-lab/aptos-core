@@ -137,6 +137,7 @@ impl Default for TransactionType {
             sender_use_account_pool: false,
             non_conflicting: false,
             use_fa_transfer: false,
+            replay_protection: ReplayProtectionType::Nonce,
         }
     }
 }

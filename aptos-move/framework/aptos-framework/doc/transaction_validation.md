@@ -5,6 +5,7 @@
 
 
 
+-  [Enum `ReplayProtector`](#0x1_transaction_validation_ReplayProtector)
 -  [Resource `TransactionValidation`](#0x1_transaction_validation_TransactionValidation)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_transaction_validation_initialize)
@@ -40,7 +41,6 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="nonce_validation.md#0x1_nonce_validation">0x1::nonce_validation</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -49,6 +49,67 @@
 </code></pre>
 
 
+
+<a id="0x1_transaction_validation_ReplayProtector"></a>
+
+## Enum `ReplayProtector`
+
+
+
+<pre><code>enum <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">ReplayProtector</a>
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>Nonce</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>0: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>SequenceNumber</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>0: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
 
 <a id="0x1_transaction_validation_TransactionValidation"></a>
 
@@ -130,15 +191,6 @@ Transaction exceeded its allocated max gas
 
 
 <pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>: u64 = 6;
-</code></pre>
-
-
-
-<a id="0x1_transaction_validation_PROLOGUE_BOTH_SEQ_NUMBER_AND_NONCE_PROVIDED"></a>
-
-
-
-<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_BOTH_SEQ_NUMBER_AND_NONCE_PROVIDED">PROLOGUE_BOTH_SEQ_NUMBER_AND_NONCE_PROVIDED</a>: u64 = 1014;
 </code></pre>
 
 
@@ -241,15 +293,6 @@ important to the semantics of the system.
 
 
 <pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_USED">PROLOGUE_NONCE_ALREADY_USED</a>: u64 = 1012;
-</code></pre>
-
-
-
-<a id="0x1_transaction_validation_PROLOGUE_NO_REPLAY_PROTECTOR_PROVIDED"></a>
-
-
-
-<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NO_REPLAY_PROTECTOR_PROVIDED">PROLOGUE_NO_REPLAY_PROTECTOR_PROVIDED</a>: u64 = 1013;
 </code></pre>
 
 
@@ -422,7 +465,7 @@ Only called during genesis to initialize system resources for this module.
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, txn_sequence_number: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, nonce: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, is_simulation: bool)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">transaction_validation::ReplayProtector</a>, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, is_simulation: bool)
 </code></pre>
 
 
@@ -434,9 +477,7 @@ Only called during genesis to initialize system resources for this module.
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
     sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     gas_payer: <b>address</b>,
-    // TODO: In the future, we can remove txn_sequence_number and nonce and <b>use</b> a replay protector enum instead here.
-    txn_sequence_number: Option&lt;u64&gt;,
-    nonce: Option&lt;u64&gt;,
+    replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">ReplayProtector</a>,
     txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
@@ -444,31 +485,31 @@ Only called during genesis to initialize system resources for this module.
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
     is_simulation: bool,
 ) {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&txn_sequence_number) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&nonce), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NO_REPLAY_PROTECTOR_PROVIDED">PROLOGUE_NO_REPLAY_PROTECTOR_PROVIDED</a>));
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&txn_sequence_number) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&nonce), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_BOTH_SEQ_NUMBER_AND_NONCE_PROVIDED">PROLOGUE_BOTH_SEQ_NUMBER_AND_NONCE_PROVIDED</a>));
-
     <b>assert</b>!(
         <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt; txn_expiration_time,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ETRANSACTION_EXPIRED">PROLOGUE_ETRANSACTION_EXPIRED</a>),
     );
     <b>assert</b>!(<a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="chain_id.md#0x1_chain_id">chain_id</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EBAD_CHAIN_ID">PROLOGUE_EBAD_CHAIN_ID</a>));
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&txn_sequence_number)) {
-        <a href="transaction_validation.md#0x1_transaction_validation_check_for_replay_protection_regular_txn">check_for_replay_protection_regular_txn</a>(
-            sender,
-            gas_payer,
-            *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&txn_sequence_number),
-            txn_authentication_key,
-            is_simulation,
-        );
-    } <b>else</b> {
-        <a href="transaction_validation.md#0x1_transaction_validation_check_for_replay_protection_orderless_txn">check_for_replay_protection_orderless_txn</a>(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender),
-            *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&nonce),
-            txn_authentication_key,
-            txn_expiration_time,
-            is_simulation,
-        );
+    match (replay_protector) {
+        SequenceNumber(txn_sequence_number) =&gt; {
+            <a href="transaction_validation.md#0x1_transaction_validation_check_for_replay_protection_regular_txn">check_for_replay_protection_regular_txn</a>(
+                sender,
+                gas_payer,
+                txn_sequence_number,
+                txn_authentication_key,
+                is_simulation,
+            );
+        },
+        Nonce(nonce) =&gt; {
+            <a href="transaction_validation.md#0x1_transaction_validation_check_for_replay_protection_orderless_txn">check_for_replay_protection_orderless_txn</a>(
+                <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender),
+                nonce,
+                txn_authentication_key,
+                txn_expiration_time,
+                is_simulation,
+            );
+        }
     };
 
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
@@ -523,8 +564,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         gas_payer,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        ReplayProtector::SequenceNumber(txn_sequence_number),
         txn_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -569,8 +609,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         gas_payer,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        ReplayProtector::SequenceNumber(txn_sequence_number),
         txn_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -591,7 +630,7 @@ Only called during genesis to initialize system resources for this module.
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue_payload_v2_extension">script_prologue_payload_v2_extension</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, nonce: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_simulation: bool)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue_payload_v2_extension">script_prologue_payload_v2_extension</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">transaction_validation::ReplayProtector</a>, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, _script_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_simulation: bool)
 </code></pre>
 
 
@@ -602,8 +641,7 @@ Only called during genesis to initialize system resources for this module.
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_script_prologue_payload_v2_extension">script_prologue_payload_v2_extension</a>(
     sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    txn_sequence_number: Option&lt;u64&gt;,
-    nonce: Option&lt;u64&gt;,
+    replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">ReplayProtector</a>,
     txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
@@ -616,8 +654,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         gas_payer,
-        txn_sequence_number,
-        nonce,
+        replay_protector,
         txn_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -664,8 +701,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         sender_addr,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        ReplayProtector::SequenceNumber(txn_sequence_number),
         txn_sender_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -712,8 +748,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         sender_addr,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        ReplayProtector::SequenceNumber(txn_sequence_number),
         txn_sender_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -735,7 +770,7 @@ Only called during genesis to initialize system resources for this module.
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_script_prologue_payload_v2_extension">multi_agent_script_prologue_payload_v2_extension</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, nonce: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, is_simulation: bool)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_script_prologue_payload_v2_extension">multi_agent_script_prologue_payload_v2_extension</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">transaction_validation::ReplayProtector</a>, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, is_simulation: bool)
 </code></pre>
 
 
@@ -746,8 +781,7 @@ Only called during genesis to initialize system resources for this module.
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_script_prologue_payload_v2_extension">multi_agent_script_prologue_payload_v2_extension</a>(
     sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    txn_sequence_number: Option&lt;u64&gt;,
-    nonce: Option&lt;u64&gt;,
+    replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">ReplayProtector</a>,
     txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
@@ -761,8 +795,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         sender_addr,
-        txn_sequence_number,
-        nonce,
+        replay_protector,
         txn_sender_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -870,8 +903,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         fee_payer_address,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        ReplayProtector::SequenceNumber(txn_sequence_number),
         txn_sender_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -924,8 +956,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         fee_payer_address,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(txn_sequence_number),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        ReplayProtector::SequenceNumber(txn_sequence_number),
         txn_sender_public_key,
         txn_gas_price,
         txn_max_gas_units,
@@ -954,7 +985,7 @@ Only called during genesis to initialize system resources for this module.
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue_payload_v2_extension">fee_payer_script_prologue_payload_v2_extension</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, nonce: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, fee_payer_address: <b>address</b>, fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, is_simulation: bool)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue_payload_v2_extension">fee_payer_script_prologue_payload_v2_extension</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">transaction_validation::ReplayProtector</a>, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, fee_payer_address: <b>address</b>, fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, is_simulation: bool)
 </code></pre>
 
 
@@ -965,8 +996,7 @@ Only called during genesis to initialize system resources for this module.
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue_payload_v2_extension">fee_payer_script_prologue_payload_v2_extension</a>(
     sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    txn_sequence_number: Option&lt;u64&gt;,
-    nonce: Option&lt;u64&gt;,
+    replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">ReplayProtector</a>,
     txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
@@ -982,8 +1012,7 @@ Only called during genesis to initialize system resources for this module.
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         fee_payer_address,
-        txn_sequence_number,
-        nonce,
+        replay_protector,
         txn_sender_public_key,
         txn_gas_price,
         txn_max_gas_units,

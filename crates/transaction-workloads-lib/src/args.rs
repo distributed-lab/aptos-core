@@ -4,9 +4,9 @@
 use crate::{
     move_workloads::{LoopType, PreBuiltPackagesImpl},
     token_workflow::TokenWorkflowKind,
-    EntryPoints, ReplayProtectionType,
+    EntryPoints,
 };
-use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress};
+use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress, ReplayProtectionType};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 

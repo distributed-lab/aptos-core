@@ -117,8 +117,8 @@ pub enum FeatureFlag {
     ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
     /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
     PERMISSIONED_SIGNER = 84,
-    TRANSACTION_PAYLOAD_V2 = 82,
-    ORDERLESS_TRANSACTIONS = 83,
+    TRANSACTION_PAYLOAD_V2 = 85,
+    ORDERLESS_TRANSACTIONS = 86,
 }
 
 impl FeatureFlag {
