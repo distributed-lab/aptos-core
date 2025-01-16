@@ -169,6 +169,14 @@ impl ConditionKind {
         )
     }
 
+    pub fn allowed_on_lambda_spec(&self) -> bool {
+        use ConditionKind::*;
+        matches!(
+            self,
+            Requires | Ensures | FunctionInvariant | LetPost(..) | LetPre(..) | Update
+        )
+    }
+
     /// Returns true if this condition is allowed on a struct.
     pub fn allowed_on_struct(&self) -> bool {
         use ConditionKind::*;
@@ -641,7 +649,14 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, AbilitySet),
+    Lambda(
+        NodeId,
+        Pattern,
+        Exp,
+        LambdaCaptureKind,
+        AbilitySet,
+        Option<Exp>,
+    ),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -1441,7 +1456,7 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body, _, _) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _, _, _) => body.visit_positions_impl(visitor)?,
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -3251,7 +3266,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body, capture_kind, abilities) => {
+            Lambda(id, pat, body, capture_kind, abilities, spec_opt) => {
                 if self.verbose {
                     write!(
                         f,
@@ -3286,10 +3301,12 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         .map(|a| a.to_string())
                         .reduce(|l, r| format!("{}, {}", l, r))
                         .unwrap_or_default();
-                    write!(f, " with {}", abilities_as_str)
-                } else {
-                    Ok(())
+                    write!(f, " with {}", abilities_as_str)?;
                 }
+                if let Some(spec) = spec_opt {
+                    write!(f, "{}", spec.display_cont(self))?;
+                }
+                Ok(())
             },
             Block(id, pat, binding, body) => {
                 if self.verbose {

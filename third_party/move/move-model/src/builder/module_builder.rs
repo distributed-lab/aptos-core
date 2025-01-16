@@ -123,8 +123,31 @@ pub enum SpecBlockContext<'a> {
     FunctionCodeV2(
         QualifiedSymbol,                                  // function name
         BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>, // local variables
+        bool,                                             // for lambda
     ),
     Schema(QualifiedSymbol),
+}
+
+impl<'a> SpecBlockContext<'a> {
+    pub fn allow_old(&self) -> bool {
+        use SpecBlockContext::*;
+        match self {
+            FunctionCode(_, _) => false,
+            FunctionCodeV2(_, _, from_lambda) => *from_lambda,
+            _ => true,
+        }
+    }
+
+    pub fn name(&self) -> Option<&QualifiedSymbol> {
+        use SpecBlockContext::*;
+        match self {
+            Struct(name, ..)
+            | FunctionCode(name, ..)
+            | FunctionCodeV2(name, ..)
+            | Schema(name, ..) => Some(name),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> fmt::Display for SpecBlockContext<'a> {
@@ -334,7 +357,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         target: &'pa EA::SpecBlockTarget,
     ) -> Option<SpecBlockContext<'pa>> {
         match &target.value {
-            EA::SpecBlockTarget_::Code => None,
+            EA::SpecBlockTarget_::Code | EA::SpecBlockTarget_::Lambda => None,
             EA::SpecBlockTarget_::Member(name, _) => {
                 let qsym = self.qualified_by_module_from_name(name);
                 if self.parent.fun_table.contains_key(&qsym) {
@@ -1947,7 +1970,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 et
             },
-            FunctionCodeV2(name, locals) => {
+            FunctionCodeV2(name, locals, _from_lambda) => {
                 let entry = &self
                     .parent
                     .fun_table
@@ -2127,7 +2150,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let entry = self.parent.fun_table.get(name).expect("function defined");
                 cond.kind.allowed_on_fun_decl(entry.visibility)
             },
-            FunctionCode(..) | FunctionCodeV2(..) => cond.kind.allowed_on_fun_impl(),
+            FunctionCode(..) => cond.kind.allowed_on_fun_impl(),
+            FunctionCodeV2(.., from_lambda) => {
+                if *from_lambda {
+                    cond.kind.allowed_on_lambda_spec()
+                } else {
+                    cond.kind.allowed_on_fun_impl()
+                }
+            },
+
             Schema(_) => true,
         };
         if !ok {
@@ -2185,7 +2216,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 true // continue visit, note all problematic subexprs
             };
             cond.exp.visit_post_order(&mut visitor);
-        } else if let FunctionCode(name, _) | FunctionCodeV2(name, _) = context {
+        } else if !context.allow_old() {
+            let name = context.name().expect("should have name");
             // Restrict accesses to function arguments only for `old(..)` in in-spec block
             let entry = self.parent.fun_table.get(name).expect("function defined");
             let mut visitor = |e: &ExpData| {

@@ -10,6 +10,7 @@ module 0x42::TestAbortInFunction {
         }
     }
     spec aborts_with {
+        assert true;
         aborts_if x == 1 with 2;
         aborts_if y == 2 with 3;
         ensures result == x;
