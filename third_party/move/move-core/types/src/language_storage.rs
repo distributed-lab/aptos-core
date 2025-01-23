@@ -131,7 +131,8 @@ impl TypeTag {
         use TypeTag::*;
         match self {
             Struct(struct_tag) => Some(struct_tag.as_ref()),
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_) => None,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_)
+            | Function(_) => None,
         }
     }
 
@@ -156,6 +157,11 @@ impl<'a> Iterator for TypeTagPreorderTraversalIter<'a> {
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 => (),
                     Vector(ty) => self.stack.push(ty),
                     Struct(struct_tag) => self.stack.extend(struct_tag.type_args.iter().rev()),
+                    Function(fun_tag) => {
+                        let FunctionTag { args, results, .. } = fun_tag.as_ref();
+                        self.stack
+                            .extend(results.iter().rev().chain(args.iter().rev()))
+                    },
                 }
                 Some(ty)
             },
