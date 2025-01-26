@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "testing")]
-use crate::natives::cryptography::ristretto255::pop_scalar_from_bytes;
+use crate::natives::cryptography::ristretto255::{
+    pop_scalar_from_bytes, pop_scalars_from_bytes,
+};
 use crate::natives::cryptography::ristretto255_point::{
     get_point_handle, NativeRistrettoPointContext,
 };
@@ -214,8 +216,8 @@ fn native_test_only_batch_prove_range(
     let val_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
     let dst = safely_pop_arg!(args, Vec<u8>);
     let num_bits = safely_pop_arg!(args, u64) as usize;
-    let v_blinding = pop_scalar_from_bytes(&mut args)?;
-    let v = pop_scalar_from_bytes(&mut args)?;
+    let v_blindings = pop_scalars_from_bytes(&mut args)?;
+    let vs = pop_scalars_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
         return Err(SafeNativeError::Abort {
@@ -224,14 +226,17 @@ fn native_test_only_batch_prove_range(
     }
 
     // Make sure only the first 64 bits are set.
-    if !v.as_bytes()[8..].iter().all(|&byte| byte == 0u8) {
+    if !vs.all(|v| v.as_bytes()[8..].iter().all(|&byte| byte == 0u8)) {
         return Err(SafeNativeError::Abort {
             abort_code: abort_codes::NFE_VALUE_OUTSIDE_RANGE,
         });
     }
 
     // Convert Scalar to u64.
-    let v = LittleEndian::read_u64(v.as_bytes());
+    let vs = vs
+        .iter()
+        .map(|v| LittleEndian::read_u64(v.as_bytes()))
+        .collect::<Vec<_>>();
 
     let mut t = Transcript::new(dst.as_slice());
 
@@ -250,12 +255,12 @@ fn native_test_only_batch_prove_range(
     };
 
     // Construct a range proof.
-    let (proof, commitment) = bulletproofs::RangeProof::prove_single(
+    let (proof, commitment) = bulletproofs::RangeProof::prove_multiple(
         &BULLETPROOF_GENERATORS,
         &pg,
         &mut t,
-        v,
-        &v_blinding,
+        vs,
+        &v_blindings,
         num_bits,
     )
     .expect("Bulletproofs prover failed unexpectedly");

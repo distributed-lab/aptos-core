@@ -8,6 +8,8 @@ module aptos_std::ristretto255_bulletproofs {
     use std::features;
     use aptos_std::ristretto255_pedersen as pedersen;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
+    #[test_only]
+    use std::vector;
 
     //
     // Constants
@@ -83,6 +85,23 @@ module aptos_std::ristretto255_bulletproofs {
         )
     }
 
+    public fun verify_batch_range_proof_pedersen(
+        comms: &vector<pedersen::Commitment>, proof: &RangeProof, 
+        num_bits: u64, dst: vector<u8>): bool 
+    {
+        assert!(features::bulletproofs_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+
+        let comms = std::vector::map_ref(comms, |com| ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)));
+        
+        verify_batch_range_proof_internal(
+            comms,
+            &ristretto255::basepoint(), &ristretto255::hash_to_point_base(),
+            proof.bytes,
+            num_bits,
+            dst
+        )
+    }
+
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (as v * val_base + r * rand_base,
     /// for some randomness `r`) satisfies `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}`.
     public fun verify_range_proof(
@@ -114,6 +133,28 @@ module aptos_std::ristretto255_bulletproofs {
         )
     }
 
+    #[test_only]
+    public fun prove_batch_range_pedersen(vals: &vector<Scalar>, rs: &vector<Scalar>, num_bits: u64, dst: vector<u8>): (RangeProof, vector<pedersen::Commitment>) {
+        let vals = std::vector::map_ref(vals, |val| scalar_to_bytes(val));
+        let rs = std::vector::map_ref(rs, |r| scalar_to_bytes(r));
+
+        let (bytes, compressed_comm) = prove_batch_range_internal(vals, rs, num_bits, dst, &ristretto255::basepoint(), &ristretto255::hash_to_point_base());
+
+        let comms = vector[];
+        
+        for (i in 0..vector::length(&vals)) {
+            let point = ristretto255::new_compressed_point_from_bytes(vector::slice(&compressed_comm, i * 32, (i + 1) * 32));
+            let point = &std::option::extract(&mut point);
+            
+            std::vector::push_back(&mut comms, pedersen::commitment_from_compressed(point));
+        };
+
+        (
+            RangeProof { bytes },
+            comms
+        )
+    }
+
     //
     // Native functions
     //
@@ -123,6 +164,14 @@ module aptos_std::ristretto255_bulletproofs {
     /// Aborts with `error::invalid_argument(E_RANGE_NOT_SUPPORTED)` if an unsupported `num_bits` is provided.
     native fun verify_range_proof_internal(
         com: vector<u8>,
+        val_base: &RistrettoPoint,
+        rand_base: &RistrettoPoint,
+        proof: vector<u8>,
+        num_bits: u64,
+        dst: vector<u8>): bool;
+    
+    native fun verify_batch_range_proof_internal(
+        com: vector<vector<u8>>,
         val_base: &RistrettoPoint,
         rand_base: &RistrettoPoint,
         proof: vector<u8>,
@@ -138,6 +187,15 @@ module aptos_std::ristretto255_bulletproofs {
     native fun prove_range_internal(
         val: vector<u8>,
         r: vector<u8>,
+        num_bits: u64,
+        dst: vector<u8>,
+        val_base: &RistrettoPoint,
+        rand_base: &RistrettoPoint): (vector<u8>, vector<u8>);
+
+    #[test_only]
+    native fun prove_batch_range_internal(
+        vals: vector<vector<u8>>,
+        rs: vector<vector<u8>>,
         num_bits: u64,
         dst: vector<u8>,
         val_base: &RistrettoPoint,
@@ -192,6 +250,28 @@ module aptos_std::ristretto255_bulletproofs {
         assert!(verify_range_proof_pedersen(&comm, &proof, 32, A_DST) == false, 1);
         assert!(verify_range_proof_pedersen(&comm, &proof, 16, A_DST) == false, 1);
         assert!(verify_range_proof_pedersen(&comm, &proof, num_bits, A_DST), 1);
+    }
+
+    #[test(fx = @std)]
+    fun test_batch_prover(fx: signer) {
+        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+
+        let vs = vector[
+            ristretto255::new_scalar_from_u64(59),
+            ristretto255::new_scalar_from_u64(60),
+        ];
+        let rs = vector[
+            std::option::extract(&mut ristretto255::new_scalar_from_bytes(A_BLINDER)),
+            std::option::extract(&mut ristretto255::new_scalar_from_bytes(A_BLINDER)),
+        ];
+        let num_bits = 8;
+
+        let (proof, comms) = prove_batch_range_pedersen(&vs, &rs, num_bits, A_DST);
+
+        assert!(verify_batch_range_proof_pedersen(&comms, &proof, 64, A_DST) == false, 1);
+        assert!(verify_batch_range_proof_pedersen(&comms, &proof, 32, A_DST) == false, 1);
+        assert!(verify_batch_range_proof_pedersen(&comms, &proof, 16, A_DST) == false, 1);
+        assert!(verify_batch_range_proof_pedersen(&comms, &proof, num_bits, A_DST), 1);
     }
 
     #[test(fx = @std)]
