@@ -226,7 +226,7 @@ fn native_test_only_batch_prove_range(
     }
 
     // Make sure only the first 64 bits are set.
-    if !vs.all(|v| v.as_bytes()[8..].iter().all(|&byte| byte == 0u8)) {
+    if !vs.iter().all(|v| v.as_bytes()[8..].iter().all(|&byte| byte == 0u8)) {
         return Err(SafeNativeError::Abort {
             abort_code: abort_codes::NFE_VALUE_OUTSIDE_RANGE,
         });
@@ -255,11 +255,11 @@ fn native_test_only_batch_prove_range(
     };
 
     // Construct a range proof.
-    let (proof, commitment) = bulletproofs::RangeProof::prove_multiple(
+    let (proof, commitments) = bulletproofs::RangeProof::prove_multiple(
         &BULLETPROOF_GENERATORS,
         &pg,
         &mut t,
-        vs,
+        &vs,
         &v_blindings,
         num_bits,
     )
@@ -267,7 +267,9 @@ fn native_test_only_batch_prove_range(
 
     Ok(smallvec![
         Value::vector_u8(proof.to_bytes()),
-        Value::vector_u8(commitment.as_bytes().to_vec())
+        Value::vector_u8(commitments.iter()
+            .flat_map(|compressed| compressed.to_bytes())
+            .collect::<Vec<_>>())
     ])
 }
 
