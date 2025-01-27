@@ -51,7 +51,7 @@ fn is_supported_number_of_bits(num_bits: usize) -> bool {
 
 /// Public parameters of the Bulletproof range proof system
 static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
-    Lazy::new(|| BulletproofGens::new(MAX_RANGE_BITS, 1));
+    Lazy::new(|| BulletproofGens::new(MAX_RANGE_BITS, 8));
 
 fn native_verify_range_proof(
     context: &mut SafeNativeContext,
